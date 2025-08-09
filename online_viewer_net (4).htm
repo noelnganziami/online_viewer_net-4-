@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choir Program Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root {
+            --theme-primary: #001f3f;
+            --theme-secondary: #000080;
+            --light-blue-accent: #a1c4fd;
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --card-hover-bg: rgba(255, 255, 255, 0.15);
+            --btn-bg: rgba(255, 255, 255, 0.15);
+            --btn-hover-bg: rgba(255, 255, 255, 0.25);
+            --delete-red: rgba(220, 53, 69, 0.5);
+            --delete-red-hover: rgba(220, 53, 69, 0.8);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body {
+            background: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary), var(--theme-primary));
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+            transition: background 0.5s ease;
+            overflow-x: hidden;
+        }
+        @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .container { max-width: 1200px; margin: 0 auto; position: relative; }
+        header { text-align: center; padding: 30px 0; position: relative; }
+        h1 { font-size: 3.5rem; margin-bottom: 10px; text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
+        .subtitle { font-size: 1.2rem; opacity: 0.9; margin-bottom: 30px; }
+        #theme-btn { position: absolute; top: 20px; right: 20px; }
+        .view { display: none; }
+        .view.active { display: block; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        #program-view .controls, #repertoire-view .controls { display: flex; justify-content: center; gap: 15px; margin-bottom: 40px; flex-wrap: wrap; }
+        
+        .program-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; }
+        .program-card { 
+            background: var(--card-bg); 
+            backdrop-filter: blur(15px); 
+            border-radius: 20px; 
+            padding: 25px; 
+            text-align: center; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .program-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+        .program-card:hover::before {
+            opacity: 1;
+        }
+        .program-card:hover { 
+            transform: translateY(-10px) scale(1.02); 
+            background: var(--card-hover-bg);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+        }
+        .program-date { font-size: 1.8rem; font-weight: 600; margin-bottom: 10px; }
+        .program-song-count { font-size: 1rem; opacity: 0.8; margin-bottom: 20px; }
+        .program-card .btn { width: 100%; justify-content: center; background: var(--btn-bg); }
+        .program-card .btn:hover { background: var(--btn-hover-bg); }
+        .older-programs-container { margin-top: 40px; text-align: center; }
+        #older-programs-dropdown { background: var(--btn-bg); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 12px 25px; border-radius: 50px; font-size: 1rem; appearance: none; cursor: pointer; }
+        #older-programs-dropdown option { background: var(--theme-primary); color: white; }
+        .btn { 
+            background: var(--btn-bg); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255, 255, 255, 0.2); 
+            color: white; 
+            padding: 12px 25px; 
+            border-radius: 50px; 
+            cursor: pointer; 
+            font-size: 1rem; 
+            transition: all 0.3s ease; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+            z-index: -1;
+        }
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        .btn:hover { 
+            background: var(--btn-hover-bg); 
+            transform: translateY(-3px); 
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2); 
+        }
+        
+        .btn.btn-delete { background-color: var(--delete-red); }
+        .btn.btn-delete:hover { background-color: var(--delete-red-hover); }
+        .btn:disabled, .btn.btn-delete:disabled { background-color: rgba(108, 117, 125, 0.2); color: rgba(255, 255, 255, 0.5); cursor: not-allowed; transform: none; box-shadow: none; }
+        .repertoire-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 25px; margin-top: 30px; }
+        .category-card { 
+            background: var(--card-bg); 
+            backdrop-filter: blur(15px); 
+            border-radius: 20px; 
+            padding: 25px; 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            transition: transform 0.3s ease; 
+            overflow: hidden; 
+            position: relative;
+        }
+        .category-card::before { 
+            content: ''; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 5px; 
+            background: linear-gradient(90deg, var(--light-blue-accent), #c2e9fb); 
+        }
+        .category-card:hover { 
+            transform: translateY(-10px); 
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+        .category-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px; 
+            padding-bottom: 15px; 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
+        }
+        .category-title { font-size: 1.8rem; font-weight: 600; }
+        .category-count { background: rgba(255, 255, 255, 0.2); border-radius: 50px; padding: 5px 15px; font-size: 0.9rem; }
+        .song-list { list-style: none; }
+        .song-item { 
+            background: rgba(255, 255, 255, 0.05); 
+            border-radius: 12px; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .song-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+        .song-item:hover::after {
+            left: 100%;
+        }
+        .song-item:hover { 
+            background: rgba(255, 255, 255, 0.1); 
+            transform: translateX(5px); 
+        }
+        .song-title { font-size: 1.3rem; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+        .song-key { background: rgba(255, 255, 255, 0.2); border-radius: 50px; padding: 3px 10px; font-size: 0.8rem; font-weight: 500; }
+        .song-details { display: flex; justify-content: space-between; font-size: 0.9rem; opacity: 0.8; }
+        .song-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .action-btn { 
+            background: rgba(255, 255, 255, 0.1); 
+            border: none; 
+            color: white; 
+            width: 36px; 
+            height: 36px; 
+            border-radius: 50%; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            transition: all 0.3s ease;
+        }
+        .action-btn:hover { 
+            background: rgba(255, 255, 255, 0.2); 
+            transform: scale(1.1) rotate(5deg);
+        }
+        .add-song-form { 
+            background: var(--card-bg); 
+            backdrop-filter: blur(15px); 
+            border-radius: 20px; 
+            padding: 30px; 
+            margin-bottom: 40px; 
+            display: none;
+            animation: slideDown 0.5s ease;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .form-title { font-size: 1.8rem; margin-bottom: 20px; text-align: center; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 8px; font-weight: 500; }
+        .form-group input, .form-group select { 
+            background: rgba(255, 255, 255, 0.1); 
+            border: 1px solid rgba(255, 255, 255, 0.2); 
+            border-radius: 10px; 
+            padding: 12px; 
+            color: white; 
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        .form-group input:focus, .form-group select:focus { 
+            outline: none; 
+            border-color: rgba(255, 255, 255, 0.5); 
+            background: rgba(100, 150, 255, 0.25); 
+            color: #000; 
+            font-weight: 500;
+            box-shadow: 0 0 10px rgba(161, 196, 253, 0.5);
+        }
+        .form-group select option { background: var(--theme-primary); color: white; }
+        .form-actions { display: flex; justify-content: center; gap: 20px; }
+        .modal { 
+            display: none; 
+            position: fixed; 
+            z-index: 1001; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.6); 
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-content { 
+            background-color: #fefefe; 
+            color: #333; 
+            margin: 5% auto; 
+            padding: 20px; 
+            border: 1px solid #888; 
+            width: 80%; 
+            max-width: 800px; 
+            border-radius: 15px;
+            animation: slideUp 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+        .modal-header h2 { font-size: 1.5rem; color: var(--theme-primary); }
+        .close-btn { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.3s ease; }
+        .close-btn:hover { color: #000; }
+        .modal-body { padding-top: 20px; max-height: 70vh; overflow-y: auto; }
+        .color-palette { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
+        .color-swatch { 
+            width: 50px; 
+            height: 50px; 
+            border-radius: 50%; 
+            cursor: pointer; 
+            border: 3px solid #ddd; 
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .color-swatch:hover { 
+            transform: scale(1.1); 
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        #pdf-preview-content table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        #pdf-preview-content th { background-color: var(--theme-primary); color: white; font-weight: 600; border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .notification { 
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            background: rgba(40, 167, 69, 0.9); 
+            color: white; 
+            padding: 15px 25px; 
+            border-radius: 10px; 
+            transform: translateX(150%); 
+            transition: transform 0.3s ease; 
+            z-index: 1002;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .notification.show { transform: translateX(0); }
+        
+        /* New visual effects */
+        .floating-notes {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+        }
+        
+        .note {
+            position: absolute;
+            font-size: 1.5rem;
+            opacity: 0.1;
+            animation: float 20s linear infinite;
+        }
+        
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.1;
+            }
+            90% {
+                opacity: 0.1;
+            }
+            100% {
+                transform: translateY(-100px) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        .loading-spinner {
+            display: none;
+            width: 40px;
+            height: 40px;
+            margin: 0 auto;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="floating-notes" id="floating-notes"></div>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-music"></i> Gfan Choir Program Manager</h1>
+            <p id="header-subtitle" class="subtitle">Save, load, and manage your choir programs</p>
+            <button class="btn" id="theme-btn"><i class="fas fa-palette"></i> Change Theme</button>
+        </header>
+        <div id="program-view" class="view active">
+            <div class="controls"><button class="btn" id="create-new-program-btn"><i class="fas fa-plus"></i> Create New Program</button></div>
+            <div class="program-grid" id="program-grid-container"></div>
+            <div class="older-programs-container" id="older-programs-container" style="display: none;"><select id="older-programs-dropdown"><option value="">Load Older Program...</option></select></div>
+        </div>
+        <div id="repertoire-view" class="view">
+            <div class="controls">
+                <button class="btn" id="back-to-programs-btn"><i class="fas fa-arrow-left"></i> Back</button>
+                <button class="btn" id="save-program-btn"><i class="fas fa-save"></i> Save</button>
+                <button class="btn" id="add-song-btn"><i class="fas fa-plus-circle"></i> Add Song</button>
+                <button class="btn" id="card-color-btn" disabled><i class="fas fa-paint-brush"></i> Card Color</button>
+                <button class="btn btn-delete" id="delete-program-btn" disabled><i class="fas fa-trash-alt"></i> Delete</button>
+                <button class="btn" id="preview-pdf-btn"><i class="fas fa-eye"></i> Preview PDF</button>
+                <button class="btn" id="export-pdf-btn"><i class="fas fa-file-pdf"></i> Export PDF</button>
+            </div>
+            <div class="add-song-form" id="add-song-form">
+                <h2 class="form-title">Add New Song</h2>
+                <form id="song-form">
+                    <div class="form-grid">
+                        <div class="form-group"><label for="song-title">Song Title</label><input type="text" id="song-title" required></div>
+                        <div class="form-group"><label for="song-key">Key</label><select id="song-key" required><option value="">Select Key</option><option value="C">C</option><option value="C#">C#</option><option value="D">D</option><option value="D#">D#</option><option value="E">E</option><option value="F">F</option><option value="F#">F#</option><option value="G">G</option><option value="G#">G#</option><option value="A">A</option><option value="A#">A#</option><option value="B">B</option></select></div>
+                        <div class="form-group"><label for="song-category">Category</label><select id="song-category" required><option value="">Select Category</option><option value="worship">Worship</option><option value="praise">Praise</option><option value="interlude">Interlude</option><option value="special">Special</option></select></div>
+                        <div class="form-group"><label for="song-leader">Leader</label><input type="text" id="song-leader" required></div>
+                        <div class="form-group"><label for="song-date">Rehearsal Date</label><input type="date" id="song-date" required></div>
+                    </div>
+                    <div class="form-actions"><button type="submit" class="btn"><i class="fas fa-save"></i> Save Song</button><button type="button" class="btn" id="cancel-btn"><i class="fas fa-times"></i> Cancel</button></div>
+                </form>
+            </div>
+            <div class="repertoire-grid" id="repertoire-grid"></div>
+        </div>
+    </div>
+    
+    <div id="pdf-preview-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>PDF Preview</h2>
+                <span class="close-btn" id="pdf-modal-close-btn">&times;</span>
+            </div>
+            <div class="modal-body" id="pdf-preview-content"></div>
+        </div>
+    </div>
+    
+    <div id="theme-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Change Global Theme</h2>
+                <span class="close-btn" id="theme-modal-close-btn">&times;</span>
+            </div>
+            <div class="modal-body" id="theme-palette"></div>
+        </div>
+    </div>
+    
+    <div id="card-color-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Change Program Card Color</h2>
+                <span class="close-btn" id="card-color-modal-close-btn">&times;</span>
+            </div>
+            <div class="modal-body" id="card-color-palette"></div>
+        </div>
+    </div>
+    
+    <div class="notification" id="notification"></div>
+    <div class="loading-spinner" id="loading-spinner"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf-autotable.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let currentProgram = {};
+            let savedPrograms = JSON.parse(localStorage.getItem('choirPrograms')) || [];
+            const emptyRepertoire = { worship: [], praise: [], interlude: [], special: [] };
+            const categoryNames = { worship: 'Worship Songs', praise: 'Praise Songs', interlude: 'Interlude Songs', special: 'Special Songs' };
+            const categoryIcons = { worship: 'fa-pray', praise: 'fa-hands-clapping', interlude: 'fa-dove', special: 'fa-star' };
+            
+            const globalThemes = { 
+                navy: { primary: '#001f3f', secondary: '#000080' }, 
+                forest: { primary: '#143A1D', secondary: '#2F6846' }, 
+                dusk: { primary: '#4C3A69', secondary: '#8D5A99' }, 
+                crimson: { primary: '#4B0000', secondary: '#8B0000' } 
+            };
+            const cardColors = ['#4a5568', '#9b2c2c', '#975a16', '#2f855a', '#2c5282', '#5b21b6', '#a21caf'];
+            
+            const dom = {
+                programView: document.getElementById('program-view'), 
+                repertoireView: document.getElementById('repertoire-view'), 
+                programGrid: document.getElementById('program-grid-container'), 
+                olderPrograms: document.getElementById('older-programs-container'), 
+                olderDropdown: document.getElementById('older-programs-dropdown'), 
+                repertoireGrid: document.getElementById('repertoire-grid'), 
+                headerSubtitle: document.getElementById('header-subtitle'), 
+                addSongForm: document.getElementById('add-song-form'), 
+                songForm: document.getElementById('song-form'), 
+                notification: document.getElementById('notification'),
+                loadingSpinner: document.getElementById('loading-spinner'),
+                floatingNotes: document.getElementById('floating-notes'),
+                createNewBtn: document.getElementById('create-new-program-btn'), 
+                backBtn: document.getElementById('back-to-programs-btn'), 
+                saveBtn: document.getElementById('save-program-btn'), 
+                addSongBtn: document.getElementById('add-song-btn'), 
+                exportPdfBtn: document.getElementById('export-pdf-btn'), 
+                previewPdfBtn: document.getElementById('preview-pdf-btn'), 
+                deleteBtn: document.getElementById('delete-program-btn'), 
+                cancelFormBtn: document.getElementById('cancel-btn'), 
+                themeBtn: document.getElementById('theme-btn'), 
+                cardColorBtn: document.getElementById('card-color-btn'),
+                pdfModal: document.getElementById('pdf-preview-modal'), 
+                themeModal: document.getElementById('theme-modal'), 
+                cardColorModal: document.getElementById('card-color-modal'), 
+                pdfModalClose: document.getElementById('pdf-modal-close-btn'), 
+                themeModalClose: document.getElementById('theme-modal-close-btn'), 
+                cardColorModalClose: document.getElementById('card-color-modal-close-btn'), 
+                themePalette: document.getElementById('theme-palette'), 
+                cardColorPalette: document.getElementById('card-color-palette'), 
+                pdfPreviewContent: document.getElementById('pdf-preview-content')
+            };
+            
+            // Create floating musical notes
+            function createFloatingNotes() {
+                const notes = ['♪', '♫', '♬', '♩', '♭', '♯'];
+                const container = dom.floatingNotes;
+                
+                // Create 15 notes at random positions
+                for (let i = 0; i < 15; i++) {
+                    const note = document.createElement('div');
+                    note.className = 'note';
+                    note.textContent = notes[Math.floor(Math.random() * notes.length)];
+                    note.style.left = `${Math.random() * 100}%`;
+                    note.style.animationDuration = `${15 + Math.random() * 15}s`;
+                    note.style.animationDelay = `${Math.random() * 5}s`;
+                    container.appendChild(note);
+                }
+            }
+            
+            // Initialize floating notes
+            createFloatingNotes();
+            
+            const switchView = (viewToShow) => {
+                dom.programView.classList.remove('active');
+                dom.repertoireView.classList.remove('active');
+                viewToShow.classList.add('active');
+            };
+            
+            const formatDate = (dateString) => {
+                if (!dateString) return 'N/A';
+                return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+            };
+            
+            const showNotification = (message, type = 'success') => {
+                dom.notification.textContent = message;
+                dom.notification.className = 'notification show';
+                dom.notification.style.background = (type === 'error') ? 'rgba(220, 53, 69, 0.9)' : 'rgba(40, 167, 69, 0.9)';
+                setTimeout(() => dom.notification.classList.remove('show'), 3000);
+            };
+            
+            const showLoading = () => {
+                dom.loadingSpinner.style.display = 'block';
+            };
+            
+            const hideLoading = () => {
+                dom.loadingSpinner.style.display = 'none';
+            };
+            
+            const applyGlobalTheme = (themeName) => {
+                const theme = globalThemes[themeName];
+                if (theme) {
+                    document.documentElement.style.setProperty('--theme-primary', theme.primary);
+                    document.documentElement.style.setProperty('--theme-secondary', theme.secondary);
+                    localStorage.setItem('choirGlobalTheme', themeName);
+                }
+            };
+            
+            const renderProgramView = () => {
+                dom.programGrid.innerHTML = '';
+                dom.olderDropdown.innerHTML = '<option value="">Load Older Program...</option>';
+                savedPrograms.sort((a, b) => new Date(b.date) - new Date(a.date));
+                const recentPrograms = savedPrograms.slice(0, 10);
+                const olderPrograms = savedPrograms.slice(10);
+                
+                recentPrograms.forEach(program => {
+                    const songCount = Object.values(program.repertoire).reduce((sum, cat) => sum + cat.length, 0);
+                    const card = document.createElement('div');
+                    card.className = 'program-card';
+                    if (program.color) card.style.backgroundColor = program.color;
+                    card.innerHTML = `<h3 class="program-date">${formatDate(program.date)}</h3><p class="program-song-count">${songCount} Songs</p><button class="btn load-program-btn" data-date="${program.date}"><i class="fas fa-upload"></i> Load Program</button>`;
+                    dom.programGrid.appendChild(card);
+                });
+                
+                if (olderPrograms.length > 0) {
+                    olderPrograms.forEach(p => dom.olderDropdown.innerHTML += `<option value="${p.date}">${formatDate(p.date)}</option>`);
+                    dom.olderPrograms.style.display = 'block';
+                } else {
+                    dom.olderPrograms.style.display = 'none';
+                }
+                
+                document.querySelectorAll('.load-program-btn').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        const button = e.currentTarget;
+                        button.classList.add('pulse');
+                        setTimeout(() => button.classList.remove('pulse'), 1000);
+                        loadProgram(e.currentTarget.dataset.date);
+                    });
+                });
+                
+                switchView(dom.programView);
+                dom.headerSubtitle.textContent = "Save, load, and manage your choir programs";
+            };
+            
+            const loadProgram = (date) => {
+                const program = savedPrograms.find(p => p.date === date);
+                if (program) {
+                    currentProgram = JSON.parse(JSON.stringify(program));
+                    renderRepertoire();
+                    dom.deleteBtn.disabled = false; 
+                    dom.cardColorBtn.disabled = false;
+                    switchView(dom.repertoireView);
+                    dom.headerSubtitle.textContent = `Editing Program for: ${formatDate(currentProgram.date)}`;
+                }
+            };
+            
+            const createNewProgram = () => {
+                currentProgram = { date: null, repertoire: JSON.parse(JSON.stringify(emptyRepertoire)), color: null };
+                renderRepertoire();
+                dom.deleteBtn.disabled = true; 
+                dom.cardColorBtn.disabled = true;
+                switchView(dom.repertoireView);
+                dom.headerSubtitle.textContent = "Creating New Program";
+            };
+            
+            const saveProgram = () => {
+                const defaultDate = currentProgram.date || new Date().toISOString().split('T')[0];
+                const date = prompt("Enter a date for this program (YYYY-MM-DD):", defaultDate);
+                if (date) {
+                    currentProgram.date = date;
+                    const existingIndex = savedPrograms.findIndex(p => p.date === date);
+                    if (existingIndex > -1) {
+                        if(confirm("A program for this date already exists. Overwrite it?")) {
+                            savedPrograms[existingIndex] = currentProgram;
+                        } else {
+                            return;
+                        }
+                    } else {
+                        savedPrograms.push(currentProgram);
+                    }
+                    localStorage.setItem('choirPrograms', JSON.stringify(savedPrograms));
+                    showNotification('Program saved successfully!');
+                    dom.headerSubtitle.textContent = `Editing Program for: ${formatDate(currentProgram.date)}`;
+                    dom.deleteBtn.disabled = false; 
+                    dom.cardColorBtn.disabled = false;
+                }
+            };
+            
+            const deleteProgram = () => {
+                if (!currentProgram.date) return;
+                if (confirm(`Are you sure you want to permanently delete the program for ${formatDate(currentProgram.date)}?`)) {
+                    savedPrograms = savedPrograms.filter(p => p.date !== currentProgram.date);
+                    localStorage.setItem('choirPrograms', JSON.stringify(savedPrograms));
+                    showNotification('Program deleted successfully!');
+                    renderProgramView();
+                }
+            };
+            
+            const renderRepertoire = () => {
+                dom.repertoireGrid.innerHTML = '';
+                for (const category in currentProgram.repertoire) {
+                    const songs = currentProgram.repertoire[category];
+                    const categoryCard = document.createElement('div');
+                    categoryCard.className = 'category-card';
+                    categoryCard.innerHTML = `
+                        <div class="category-header">
+                            <h2 class="category-title"><i class="fas ${categoryIcons[category]}"></i> ${categoryNames[category]}</h2>
+                            <span class="category-count">${songs.length} songs</span>
+                        </div>
+                        <ul class="song-list">
+                            ${songs.map((song, i) => `
+                                <li class="song-item">
+                                    <div class="song-title">${song.title || 'Untitled'}<span class="song-key">${song.key || 'N/A'}</span></div>
+                                    <div class="song-details">
+                                        <span><i class="fas fa-calendar"></i> ${formatDate(song.date)}</span>
+                                        <span><i class="fas fa-user"></i> ${song.leader || 'N/A'}</span>
+                                    </div>
+                                    <div class="song-actions">
+                                        <button class="action-btn edit-btn" data-cat="${category}" data-idx="${i}"><i class="fas fa-edit"></i></button>
+                                        <button class="action-btn delete-btn" data-cat="${category}" data-idx="${i}"><i class="fas fa-trash-alt"></i></button>
+                                    </div>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    `;
+                    dom.repertoireGrid.appendChild(categoryCard);
+                }
+                
+                document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', handleEditSong));
+                document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', handleDeleteSong));
+            };
+            
+            const showAddSongForm = () => { 
+                dom.addSongForm.style.display = 'block'; 
+                dom.addSongBtn.style.display = 'none'; 
+            };
+            
+            const hideAddSongForm = () => { 
+                dom.addSongForm.style.display = 'none'; 
+                dom.addSongBtn.style.display = 'flex'; 
+                dom.songForm.reset(); 
+                dom.songForm.onsubmit = handleAddSong; 
+            };
+            
+            const handleAddSong = e => {
+                e.preventDefault();
+                const category = document.getElementById('song-category').value;
+                currentProgram.repertoire[category].push({ 
+                    title: document.getElementById('song-title').value, 
+                    key: document.getElementById('song-key').value, 
+                    leader: document.getElementById('song-leader').value, 
+                    date: document.getElementById('song-date').value 
+                });
+                renderRepertoire(); 
+                hideAddSongForm();
+                showNotification('Song added successfully!');
+            };
+            
+            const handleEditSong = e => {
+                const { cat, idx } = e.currentTarget.dataset;
+                const song = currentProgram.repertoire[cat][idx];
+                document.getElementById('song-title').value = song.title || '';
+                document.getElementById('song-key').value = song.key || '';
+                document.getElementById('song-category').value = cat || '';
+                document.getElementById('song-leader').value = song.leader || '';
+                document.getElementById('song-date').value = song.date || '';
+                showAddSongForm();
+                dom.songForm.onsubmit = ev => {
+                    ev.preventDefault();
+                    const newCat = document.getElementById('song-category').value;
+                    const updatedSong = { 
+                        title: document.getElementById('song-title').value, 
+                        key: document.getElementById('song-key').value, 
+                        leader: document.getElementById('song-leader').value, 
+                        date: document.getElementById('song-date').value
+                    };
+                    if (newCat !== cat) {
+                        currentProgram.repertoire[cat].splice(idx, 1);
+                        currentProgram.repertoire[newCat].push(updatedSong);
+                    } else {
+                        currentProgram.repertoire[cat][idx] = updatedSong;
+                    }
+                    renderRepertoire(); 
+                    hideAddSongForm();
+                    showNotification('Song updated successfully!');
+                };
+            };
+            
+            const handleDeleteSong = e => {
+                const { cat, idx } = e.currentTarget.dataset;
+                if (confirm('Delete this song?')) { 
+                    currentProgram.repertoire[cat].splice(idx, 1); 
+                    renderRepertoire();
+                    showNotification('Song deleted successfully!');
+                }
+            };
+            
+            const showPdfPreview = () => {
+                const title = `Choir Program: ${currentProgram.date ? formatDate(currentProgram.date) : 'New Program'}`;
+                let html = `<h2 class="preview-title">${title}</h2>`;
+                for (const cat in currentProgram.repertoire) {
+                    if (currentProgram.repertoire[cat].length > 0) {
+                        html += `
+                            <div class="preview-category">
+                                <h3>${categoryNames[cat]}</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Key</th>
+                                            <th>Leader</th>
+                                            <th>Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${currentProgram.repertoire[cat].map(s => `
+                                            <tr>
+                                                <td>${s.title}</td>
+                                                <td>${s.key}</td>
+                                                <td>${s.leader}</td>
+                                                <td>${formatDate(s.date)}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    }
+                }
+                dom.pdfPreviewContent.innerHTML = html; 
+                openModal(dom.pdfModal);
+            };
+            
+            const exportToPdf = () => {
+                try {
+                    showLoading();
+                    
+                    // Check if jsPDF is loaded
+                    if (typeof window.jspdf === 'undefined') {
+                        throw new Error('jsPDF library not loaded');
+                    }
+                    
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    const programTitle = `Choir Program: ${currentProgram.date ? formatDate(currentProgram.date) : 'New Program'}`;
+                    
+                    // Add title
+                    doc.setFontSize(22);
+                    doc.text(programTitle, doc.internal.pageSize.width / 2, 15, { align: 'center' });
+                    
+                    let finalY = 25;
+                    
+                    // Add each category as a table
+                    for (const category in currentProgram.repertoire) {
+                        if (currentProgram.repertoire[category].length > 0) {
+                            // Check if we need a new page
+                            if (finalY > doc.internal.pageSize.height - 40) { 
+                                doc.addPage(); 
+                                finalY = 15; 
+                            }
+                            
+                            // Add category title
+                            doc.setFontSize(16); 
+                            doc.text(categoryNames[category], 14, finalY);
+                            
+                            // Prepare table data
+                            const head = [['Title', 'Key', 'Leader', 'Date']];
+                            const body = currentProgram.repertoire[category].map(song => [
+                                song.title || '-', 
+                                song.key || '-', 
+                                song.leader || '-', 
+                                formatDate(song.date) || '-'
+                            ]);
+                            
+                            // Add table
+                            doc.autoTable({ 
+                                startY: finalY + 5, 
+                                head: head, 
+                                body: body, 
+                                theme: 'grid', 
+                                headStyles: { fillColor: [0, 31, 63] } 
+                            });
+                            
+                            // Update finalY position
+                            finalY = doc.lastAutoTable.finalY + 15;
+                        }
+                    }
+                    
+                    // Save the PDF
+                    doc.save(`choir-program-${currentProgram.date || 'new'}.pdf`);
+                    hideLoading();
+                    showNotification('PDF exported successfully!');
+                } catch (error) {
+                    console.error("PDF Export failed:", error);
+                    hideLoading();
+                    showNotification('Error: Failed to generate PDF. Check console.', 'error');
+                }
+            };
+            
+            const openModal = (modal) => {
+                modal.style.display = "block";
+                // Add animation to modal content
+                setTimeout(() => {
+                    modal.querySelector('.modal-content').classList.add('pulse');
+                    setTimeout(() => {
+                        modal.querySelector('.modal-content').classList.remove('pulse');
+                    }, 1000);
+                }, 100);
+            };
+            
+            const closeModal = (modal) => modal.style.display = "none";
+            
+            // Event Listeners
+            dom.createNewBtn.addEventListener('click', createNewProgram);
+            dom.saveBtn.addEventListener('click', saveProgram);
+            dom.deleteBtn.addEventListener('click', deleteProgram);
+            dom.backBtn.addEventListener('click', renderProgramView);
+            dom.olderDropdown.addEventListener('change', e => e.target.value && loadProgram(e.target.value));
+            dom.addSongBtn.addEventListener('click', showAddSongForm);
+            dom.cancelFormBtn.addEventListener('click', hideAddSongForm);
+            dom.songForm.onsubmit = handleAddSong;
+            dom.exportPdfBtn.addEventListener('click', exportToPdf);
+            dom.previewPdfBtn.addEventListener('click', showPdfPreview);
+            dom.themeBtn.addEventListener('click', () => openModal(dom.themeModal));
+            dom.cardColorBtn.addEventListener('click', () => openModal(dom.cardColorModal));
+            
+            // Modal close events
+            [dom.pdfModal, dom.themeModal, dom.cardColorModal].forEach(m => {
+                window.addEventListener('click', e => { if (e.target == m) closeModal(m); });
+                m.querySelector('.close-btn').addEventListener('click', () => closeModal(m));
+            });
+            
+            // Theme palette
+            Object.keys(globalThemes).forEach(name => {
+                const theme = globalThemes[name];
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.style.background = `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`;
+                swatch.onclick = () => { 
+                    applyGlobalTheme(name); 
+                    closeModal(dom.themeModal); 
+                    showNotification('Theme changed successfully!');
+                };
+                dom.themePalette.appendChild(swatch);
+            });
+            
+            // Card color palette
+            cardColors.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.style.backgroundColor = color;
+                swatch.onclick = () => { 
+                    currentProgram.color = color; 
+                    showNotification('Card color set. Save the program to keep it.', 'info'); 
+                    closeModal(dom.cardColorModal); 
+                };
+                dom.cardColorPalette.appendChild(swatch);
+            });
+            
+            // Initialize theme
+            applyGlobalTheme(localStorage.getItem('choirGlobalTheme') || 'navy');
+            
+            // Initialize view
+            renderProgramView();
+        });
+// Register the service worker for PWA offline capability
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+        });
+    });
+}
+    </script>
+</body>
+</html>
